@@ -1,0 +1,420 @@
+/*Collection of LED patterns that can be cycled through by pressing a button.
+  rainbow(), confetti(), sinelon(), bpm(), and juggle() are from DemoReel100 FASTLED example code.
+  All other patterns are my own.
+
+  Author: Morgan Cupp; Last Edited: 9/1/2021 */
+
+#include <FastLED.h>
+
+#define DATA_PIN     13
+#define BUTTON_PIN   1
+#define NUM_LEDS     300
+#define BRIGHTNESS   96
+#define FPS          120
+#define LED_TYPE     WS2812B
+#define COLOR_ORDER  GRB
+#define NUM_PATTERNS 10
+
+CRGB leds[NUM_LEDS];
+int button_state = 0;
+int prev_button_state = 0;
+int color = 0;
+int pattern_id = 0;
+bool instant_update_enabled = true;
+
+
+void setup() {
+  delay(1000);
+  FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.setBrightness(BRIGHTNESS);
+  pinMode(BUTTON_PIN, INPUT);
+}
+
+void loop() {
+  call_pattern();
+  FastLED.show();  
+  FastLED.delay(1000/FPS); 
+  EVERY_N_MILLISECONDS(20){color++;}
+  prev_button_state = button_state;
+  button_state = digitalRead(BUTTON_PIN);
+  if (instant_update_enabled and button_was_pressed()) {
+    advance_to_next_pattern();
+  }
+}
+
+void call_pattern() {
+  if (pattern_id == 0) {
+    rainbow();
+  } else if (pattern_id == 1) {
+    confetti();
+  } else if (pattern_id == 2) {
+    sinelon();
+  } else if (pattern_id == 3) {
+    bpm();
+  } else if (pattern_id == 4) {
+    juggle();
+  } else if (pattern_id == 5) {
+    monochrome();
+  } else if (pattern_id == 6) {
+    instant_update_enabled = false;
+    collide();
+  } else if (pattern_id == 7) {
+    pacman();
+  } else if (pattern_id == 8) {
+    worm();
+  } else {
+    connect_the_dots();
+  }
+}
+
+bool button_was_pressed() {
+  return prev_button_state == LOW and button_state == HIGH;
+}
+
+void advance_to_next_pattern() {
+  pattern_id++;
+  if (pattern_id == NUM_PATTERNS) {
+    pattern_id = 0;
+  }
+}
+
+void rainbow() {
+  fill_rainbow(leds, NUM_LEDS, color, 7);
+}
+
+void confetti() {
+  fadeToBlackBy(leds, NUM_LEDS, 10);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV(color+random8(64), 200, 255);
+}
+
+void sinelon() {
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+  int pos = beatsin16(13, 0, NUM_LEDS-1);
+  leds[pos] += CHSV(color, 255, 192);
+}
+
+void bpm() {
+  uint8_t BeatsPerMinute = 62;
+  CRGBPalette16 palette = PartyColors_p;
+  uint8_t beat = beatsin8(BeatsPerMinute, 64, 255);
+  for(int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = ColorFromPalette(palette, color+(i*2), beat-color+(i*10));
+  }
+}
+
+void juggle() {
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+  byte dothue = 0;
+  for(int i = 0; i < 8; i++) {
+    leds[beatsin16(i+7, 0, NUM_LEDS-1 )] |= CHSV(dothue, 200, 255);
+    dothue += 32;
+  }
+}
+
+void monochrome() {
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CHSV(color, 255, 150);
+    delay(50);
+}
+
+void collide(){
+  for (int i = 0; i < NUM_LEDS/2; i++){
+    leds[i] = CHSV(color++, 255, 255);
+    leds[NUM_LEDS-1-i] = CHSV(color++, 255, 255);
+		FastLED.show(); 
+		fade_all();
+		delay(10);
+  }
+  change_pattern_if_holding_button();
+}
+
+bool change_pattern_if_holding_button() {
+  if (digitalRead(BUTTON_PIN) == HIGH) {
+    advance_to_next_pattern();
+  }
+}
+
+void fade_all() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i].nscale8(250); 
+  }
+}
+
+void pacman() {
+  sequentially_turn_off_leds();
+  change_pattern_if_holding_button();
+  populate_white_dots();
+  create_pacman_and_ghosts();
+  blink_one_white_dot();
+  animate_before_eating_dot();
+  animate_after_eating_dot();
+  move_pacman_and_ghosts_to_end();
+  remove_pacman();
+  remove_red_ghost();
+  remove_cyan_ghost();
+  remove_orange_ghost();
+  change_pattern_if_holding_button();
+  delay(2.5);
+}
+
+void sequentially_turn_off_leds() {
+  for (int i = 0; i < 300; i++) {
+    leds[i] = CRGB::Black;
+    FastLED.show();
+    delay(1);
+  }
+}
+
+void populate_white_dots() {
+  for (int i = NUM_LEDS-1; i > 13; i = i-4){
+    leds[i] = CHSV(0, 0, 50);
+    FastLED.show();
+    delay(100);
+  }
+  delay(1000);
+}
+
+void create_pacman_and_ghosts() {
+  leds[10] = CRGB::Yellow;
+  FastLED.show();
+  delay(300);
+  leds[6] = CRGB::Red;
+  FastLED.show();
+  delay(300);
+  leds[4] = CRGB::Cyan;
+  FastLED.show();
+  delay(300);
+  leds[2] = CRGB::Orange;
+  FastLED.show();
+  delay(300);
+  leds[0] = CRGB::DeepPink;
+  FastLED.show();
+  delay(300);
+}
+
+void blink_one_white_dot() {
+  for (int i = 0; i < 5; i++){
+    leds[199] = CRGB::Black;
+    FastLED.show();
+    delay(480);
+    leds[199] = CRGB::White;
+    FastLED.show();
+    delay(480);
+  }
+}
+
+void animate_before_eating_dot() {
+  bool white_dot_on = false;
+  for (int i = 0; i < 190; i++){
+    white_dot_on = blink_white_dot_every_eight_moves(white_dot_on, i);
+    move_pacman_and_ghosts_forward(i);
+  }
+}
+
+bool blink_white_dot_every_eight_moves(bool led_on, int move_number) {
+  if (move_number%8 == 0) {
+    if (led_on) {
+      leds[199] = CRGB::White;
+      FastLED.show();
+      return false;
+    }
+    else {
+      leds[199] = CRGB::Black;
+      FastLED.show();
+      return true;
+    }
+  }
+}
+
+void move_pacman_and_ghosts_forward(int i) {
+  leds[i+10] = CRGB::Yellow;
+  leds[i+6] = CRGB::Red;
+  leds[i+4] = CRGB::Cyan;  
+  leds[i+2] = CRGB::Orange;
+  leds[i] = CRGB::DeepPink;
+  FastLED.show();
+  leds[i+10] = CRGB::Black;
+  leds[i+6] = CRGB::Black;
+  leds[i+4] = CRGB::Black;  
+  leds[i+2] = CRGB::Black;
+  leds[i] = CRGB::Black;
+  delay(30);
+}
+
+void animate_after_eating_dot() {
+  for (int i = 189; i > 99; i--){
+    leds[i+10] = CRGB::Yellow;
+    leds[i+6] = CRGB::Blue;
+    leds[i+4] = CRGB::Blue;  
+    leds[i+2] = CRGB::Blue;
+    leds[i] = CRGB::Blue;
+    FastLED.show();
+    leds[i+10] = CRGB::Black;
+    leds[i+6] = CRGB::Black;
+    leds[i+4] = CRGB::Black;  
+    leds[i+2] = CRGB::Black;
+    leds[i] = CRGB::Black;
+    delay(30);
+  }
+}
+
+void move_pacman_and_ghosts_to_end() {
+  for (int i = 100; i < 290; i++){
+    leds[i+10] = CRGB::Yellow;
+    leds[i+6] = CRGB::Red;
+    leds[i+4] = CRGB::Cyan;  
+    leds[i+2] = CRGB::Orange;
+    leds[i] = CRGB::DeepPink;
+    FastLED.show();
+    leds[i+10] = CRGB::Black;
+    leds[i+6] = CRGB::Black;
+    leds[i+4] = CRGB::Black;  
+    leds[i+2] = CRGB::Black;
+    leds[i] = CRGB::Black;
+    delay(30);
+  }
+}
+
+void remove_pacman() {
+  for (int i = 290; i < 294; i++) {
+    leds[i+6] = CRGB::Red;
+    leds[i+4] = CRGB::Cyan;  
+    leds[i+2] = CRGB::Orange;
+    leds[i] = CRGB::DeepPink;
+    FastLED.show();
+    leds[i+6] = CRGB::Black;
+    leds[i+4] = CRGB::Black;  
+    leds[i+2] = CRGB::Black;
+    leds[i] = CRGB::Black;
+    
+    delay(30);
+  }
+}
+
+void remove_red_ghost() {
+  for (int i = 294; i < 296; i++) {
+    leds[i+4] = CRGB::Cyan;  
+    leds[i+2] = CRGB::Orange;
+    leds[i] = CRGB::DeepPink;
+    FastLED.show();
+    leds[i+4] = CRGB::Black;  
+    leds[i+2] = CRGB::Black;
+    leds[i] = CRGB::Black;
+    delay(30);
+  }
+}
+
+void remove_cyan_ghost() {
+  for (int i = 296; i < 298; i++) {
+    leds[i+2] = CRGB::Orange;
+    leds[i] = CRGB::DeepPink;
+    FastLED.show();
+    leds[i+2] = CRGB::Black;
+    leds[i] = CRGB::Black;
+    delay(30);
+  }
+}
+
+void remove_orange_ghost() {
+  for (int i = 298; i < 300; i++) {
+    leds[i] = CRGB::DeepPink;
+    FastLED.show();
+    leds[i] = CRGB::Black;
+    delay(30);
+  }
+  FastLED.show();
+}
+
+int hue = 0;
+int value = 255;
+int value_change = 1;
+
+void worm() { 
+  move_worm_forwards();
+  change_pattern_if_holding_button();
+  move_worm_backwards();
+	change_pattern_if_holding_button();
+}
+
+void move_worm_forwards() {
+	for (int i = 0; i < NUM_LEDS; i++) {
+    move_worm(i);
+	}
+}
+
+void move_worm (int i) {
+	leds[i] = CHSV(hue++, 255, value);
+	FastLED.show(); 
+	fade_all();
+	value = value-value_change;
+	if (value == 1) {
+	  value_change = -1;
+	} else if (value == 255) {
+	  value_change = 1;
+	}
+	delay(10);
+}
+
+void move_worm_backwards() {
+	for (int i = NUM_LEDS-1; i >= 0; i--) {
+    move_worm(i);
+	}
+}
+
+int current_position = random(1, NUM_LEDS);
+int next_position = random(1, NUM_LEDS);
+int current_color = random(1, 360);
+int next_color = random(1, 360);
+
+void connect_the_dots() {
+  turn_on_next_led();
+  int movement_direction = detect_movement_direction();
+  connect_dots(movement_direction);
+  initialize_next_cycle();
+  return_to_first_pattern();
+}
+
+void turn_on_next_led() {
+  for (int value = 0; value <= 255; value++) {
+    leds[current_position] = CHSV(current_color, 255, 255);
+    fadeToBlackBy(leds, NUM_LEDS, 5);
+    leds[next_position] = CHSV(next_color, 255, value);
+    FastLED.show();
+  }
+}
+
+int detect_movement_direction() {
+  if (current_position < next_position) {
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+void connect_dots(int increment) {
+  while (current_position != next_position) {
+    fadeToBlackBy(leds, NUM_LEDS, 5);
+    current_position = current_position + increment;
+    leds[current_position] = CHSV(current_color, 255, 255);
+    leds[next_position] = CHSV(next_color, 255, 255);
+    FastLED.show();
+    delay(10);
+  }
+}
+
+void initialize_next_cycle() {
+  current_color = next_color;
+  next_position = random(1, NUM_LEDS);
+  next_color = random(1, 360);
+}
+
+void return_to_first_pattern() {
+	if (digitalRead(BUTTON_PIN) == HIGH) {
+    advance_to_next_pattern();
+    instant_update_enabled = true;
+    button_state = LOW;
+    prev_button_state = LOW;
+    delay(1000);
+  }
+}
